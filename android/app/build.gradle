@@ -84,6 +84,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        resValue "string", "server_client_id", "447522045620-3o02ugei8ghntm0fhld38tl18shgpef1.apps.googleusercontent.com"
     }
     signingConfigs {
         debug {

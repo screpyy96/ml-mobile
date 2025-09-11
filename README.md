@@ -1,3 +1,28 @@
+# Meserias Local App
+
+A React Native application for connecting local craftsmen with clients.
+
+## Architecture Notes
+
+### New Architecture Migration
+
+The app is currently running on React Native 0.80.1 with the Legacy Architecture. To migrate to the New Architecture:
+
+1. **Enable New Architecture**:
+   ```bash
+   # For iOS
+   cd ios && RCT_NEW_ARCH_ENABLED=1 pod install && cd ..
+   
+   # For Android
+   # Add to android/gradle.properties:
+   # newArchEnabled=true
+   ```
+
+2. **Update dependencies** to versions that support New Architecture
+3. **Test thoroughly** as some third-party libraries may not be compatible yet
+
+**Note**: The New Architecture provides better performance and is the future of React Native, but migration should be done carefully in a production app.
+
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
 # Getting Started

@@ -6,13 +6,14 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
 
 platform :ios, min_ios_version_supported
+install! 'cocoapods', :disable_input_output_paths => true
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+# Disable New Architecture temporarily to fix build issues
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+
+# Avoid use_frameworks! to prevent non-modular header issues with RN pods.
+# If a specific Pod requires frameworks, enable it selectively for that Pod.
 
 target 'MeseriasLocalAppNew' do
   config = use_native_modules!
@@ -20,7 +21,9 @@ target 'MeseriasLocalAppNew' do
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    # Match Xcode setting: disable Hermes for now to avoid mismatches
+    :hermes_enabled => false
   )
 
   post_install do |installer|
@@ -31,5 +34,20 @@ target 'MeseriasLocalAppNew' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    
+    # Fix for build issues
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        # Remove architecture exclusions for Apple Silicon compatibility
+        config.build_settings.delete('EXCLUDED_ARCHS[sdk=iphonesimulator*]')
+
+        # Ensure proper architecture support
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+
+        # Fix: allow non-modular includes used by some Pods to avoid error(=non-modular-include-in-framework-module)
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+    end
   end
 end
