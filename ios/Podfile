@@ -5,12 +5,13 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, min_ios_version_supported
+platform :ios, '15.1'
+inhibit_all_warnings!
 install! 'cocoapods', :disable_input_output_paths => true
 prepare_react_native_project!
 
-# Disable New Architecture temporarily to fix build issues
-ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+# Enable React Native New Architecture (TurboModules + Fabric)
+ENV['RCT_NEW_ARCH_ENABLED'] = '1'
 
 # Avoid use_frameworks! to prevent non-modular header issues with RN pods.
 # If a specific Pod requires frameworks, enable it selectively for that Pod.
@@ -22,8 +23,8 @@ target 'MeseriasLocalAppNew' do
     :path => config[:reactNativePath],
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/..",
-    # Match Xcode setting: disable Hermes for now to avoid mismatches
-    :hermes_enabled => false
+    # Enable Hermes engine under New Architecture
+    :hermes_enabled => true
   )
 
   post_install do |installer|
@@ -47,7 +48,22 @@ target 'MeseriasLocalAppNew' do
 
         # Fix: allow non-modular includes used by some Pods to avoid error(=non-modular-include-in-framework-module)
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+
+        # Ensure inherited preprocessor definitions are preserved
+        defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+
+        # Xcode 15+: Disable User Script Sandboxing so CocoaPods script phases
+        # (like Hermes prepare via rsync) can write into DerivedData paths
+        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+
+        # Fix iOS deployment target warnings - set minimum to 15.1
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
       end
+
+      # NOTE: RNBootSplash is now compatible with RN 0.80; no per-pod
+      # RCT_NEW_ARCH_ENABLED override is required anymore.
     end
   end
 end
+

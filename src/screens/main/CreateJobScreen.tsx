@@ -1,16 +1,16 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { colors } from '../../constants/colors';
 
 const CreateJobScreen: React.FC = () => {
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen backgroundColor={colors.background}>
       <ScrollView>
         <Text style={styles.placeholder}>Ecran creare cerere - în dezvoltare</Text>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

@@ -2,9 +2,15 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { TouchableOpacity, View } from 'react-native';
+import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { colors } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 import { transitionPresets } from '../design-system/components/Navigation/transitions';
+import AppDrawer from './AppDrawer';
+import { toggleDrawer } from './drawerControl';
+import MenuPlaceholder from './MenuPlaceholder';
 
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -52,21 +58,25 @@ export type SearchStackParamList = {
 };
 
 export type DashboardStackParamList = {
+  DashboardIndex: undefined;
   Dashboard: undefined;
-  WorkerDashboard: undefined;
   ClientDashboard: undefined;
   Jobs: { jobs: any[], onSave: (jobId: string) => void, onApply: (jobId: string) => void, availableJobsCount: number };
+  JobDetails: { jobId: string };
   Applications: { applications: any[], pendingApplicationsCount: number };
   SavedJobs: { jobs: any[], onSave: (jobId: string) => void, onApply: (jobId: string) => void, availableJobsCount: number };
   Reviews: { reviews: any[], totalReviewsCount: number };
   Settings: undefined;
+  Notifications: undefined;
   Subscription: undefined;
   EditProfile: undefined;
+  Profile: undefined;
 };
 
 export type ProfileStackParamList = {
   ProfileIndex: undefined;
   EditProfile: undefined;
+  Subscription: undefined;
 };
 
 const HomeStack = createStackNavigator<HomeStackParamList>();
@@ -77,6 +87,19 @@ const ProfileStack = createStackNavigator<ProfileStackParamList>();
 const SubscriptionStack = createStackNavigator();
 const WorkerDashboardStack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+const CustomTabBarButton: React.FC<BottomTabBarButtonProps> = ({ children, onPress, accessibilityState }) => {
+  const focused = accessibilityState?.selected;
+  return (
+  <TouchableOpacity
+    style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+    onPress={onPress}
+  >
+    {children}
+  </TouchableOpacity>
+  );
+};
+
 
 // WorkerDashboardStack
 const WorkerDashboardStackNavigator: React.FC = () => {
@@ -93,6 +116,7 @@ const WorkerDashboardStackNavigator: React.FC = () => {
       <WorkerDashboardStack.Screen name="SavedJobs" component={SavedJobsScreen} />
       <WorkerDashboardStack.Screen name="Reviews" component={ReviewsScreen} />
       <WorkerDashboardStack.Screen name="Settings" component={SettingsScreen} />
+      <WorkerDashboardStack.Screen name="Notifications" component={NotificationsScreen} />
       <WorkerDashboardStack.Screen 
         name="Subscription" 
         component={SubscriptionScreen}
@@ -298,6 +322,15 @@ const ProfileStackNavigator: React.FC = () => {
           ...transitionPresets.slide
         }}
       />
+      <ProfileStack.Screen 
+        name="Subscription" 
+        component={SubscriptionScreen}
+        options={{ 
+          headerShown: true, 
+          title: 'Abonament',
+          ...transitionPresets.slide
+        }}
+      />
     </ProfileStack.Navigator>
   );
 };
@@ -312,7 +345,7 @@ const DashboardStackNavigator: React.FC = () => {
     
     switch (user.userType) {
       case 'meserias':
-        return WorkerDashboardStackNavigator;
+        return WorkerDashboardScreen;
       case 'client':
         return ClientDashboardScreen;
       default:
@@ -331,13 +364,36 @@ const DashboardStackNavigator: React.FC = () => {
         name="DashboardIndex" 
         component={getDashboardComponent()}
       />
-      <DashboardStack.Screen
-        name="WorkerDashboard"
-        component={WorkerDashboardStackNavigator}
-        options={{ 
-          headerShown: false,
-          ...transitionPresets.fade
-        }}
+      {/* Route targets used from HomeScreen buttons */}
+      <DashboardStack.Screen 
+        name="Jobs" 
+        component={JobsScreen}
+        options={{ headerShown: true, title: 'Joburi', headerBackTitle: 'Înapoi', ...transitionPresets.slide }}
+      />
+      <DashboardStack.Screen 
+        name="JobDetails" 
+        component={JobDetailsScreen}
+        options={{ headerShown: true, title: 'Detalii lucrare', ...transitionPresets.slide }}
+      />
+      <DashboardStack.Screen 
+        name="Applications" 
+        component={ApplicationsScreen}
+        options={{ headerShown: true, title: 'Aplicațiile mele', ...transitionPresets.slide }}
+      />
+      <DashboardStack.Screen 
+        name="SavedJobs" 
+        component={SavedJobsScreen}
+        options={{ headerShown: true, title: 'Joburi salvate', ...transitionPresets.slide }}
+      />
+      <DashboardStack.Screen 
+        name="Reviews" 
+        component={ReviewsScreen}
+        options={{ headerShown: true, title: 'Recenzii', ...transitionPresets.slide }}
+      />
+      <DashboardStack.Screen 
+        name="Settings" 
+        component={SettingsScreen}
+        options={{ headerShown: true, title: 'Setări', ...transitionPresets.slide }}
       />
       <DashboardStack.Screen
         name="ClientDashboard"
@@ -347,12 +403,22 @@ const DashboardStackNavigator: React.FC = () => {
           ...transitionPresets.fade
         }}
       />
+      <DashboardStack.Screen name="Notifications" component={NotificationsScreen} />
       <DashboardStack.Screen
         name="EditProfile"
         component={EditProfileScreen}
         options={{ 
           headerShown: true, 
           title: 'Editare Profil',
+          ...transitionPresets.slide
+        }}
+      />
+      <DashboardStack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ 
+          headerShown: true, 
+          title: 'Profil',
           ...transitionPresets.slide
         }}
       />
@@ -364,46 +430,59 @@ const MainTabs: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <Tab.Navigator
+    <AppDrawer>
+      <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarIcon: ({ color, size }) => {
-          let icon = 'home';
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          height: 60,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 8,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarIcon: ({ color, size, focused }) => {
+          let icon = 'home-outline';
           switch (route.name) {
             case 'Home':
-              icon = 'home';
+              icon = focused ? 'home' : 'home-outline';
               break;
             case 'Search':
-              icon = 'search';
+              icon = focused ? 'magnify' : 'magnify';
               break;
             case 'Dashboard':
-              icon = user?.userType === 'meserias' ? 'dashboard' : 'work';
+              icon = user?.userType === 'meserias' ? (focused ? 'view-dashboard' : 'view-dashboard-outline') : (focused ? 'briefcase' : 'briefcase-outline');
               break;
             case 'Messages':
-              icon = 'chat';
+              icon = focused ? 'chat' : 'chat-outline';
               break;
             case 'Profile':
-              icon = 'person';
+              icon = focused ? 'account' : 'account-outline';
               break;
             default:
-              icon = 'home';
+              icon = focused ? 'home' : 'home-outline';
           }
-          return <Icon name={icon} size={size} color={color} />;
+          return <MCIcon name={icon} size={size} color={color} />;
         },
       })}
     >
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
-        options={{ tabBarLabel: 'Acasă' }}
+        options={{ tabBarLabel: 'Acasă', tabBarButton: (props) => <CustomTabBarButton {...props} /> }}
       />
       <Tab.Screen
         name="Search"
         component={SearchStackNavigator}
         options={{
           tabBarLabel: user?.userType === 'meserias' ? 'Alți meseriași' : 'Meșeriași',
+          tabBarButton: (props) => <CustomTabBarButton {...props} />,
         }}
       />
       <Tab.Screen
@@ -411,19 +490,38 @@ const MainTabs: React.FC = () => {
         component={DashboardStackNavigator}
         options={{
           tabBarLabel: user?.userType === 'meserias' ? 'Dashboard' : 'Cereri',
+          tabBarButton: (props) => <CustomTabBarButton {...props} />,
         }}
       />
       <Tab.Screen
         name="Messages"
         component={MessagesScreen}
-        options={{ tabBarLabel: 'Mesaje' }}
+        options={{ tabBarLabel: 'Mesaje', tabBarButton: (props) => <CustomTabBarButton {...props} /> }}
       />
+      {/* Drawer opener in tab bar */}
       <Tab.Screen
-        name="Profile"
-        component={ProfileStackNavigator}
-        options={{ tabBarLabel: 'Profil' }}
+        name="Menu"
+        component={MenuPlaceholder}
+        options={{
+          tabBarLabel: 'Meniu',
+          tabBarIcon: ({ color, size }) => (
+            <MCIcon name="menu" size={size} color={color} />
+          ),
+          tabBarButton: (props) => (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Deschide meniul"
+              activeOpacity={0.8}
+              onPress={() => toggleDrawer?.()}
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <MCIcon name="menu" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+        }}
       />
-    </Tab.Navigator>
+      </Tab.Navigator>
+    </AppDrawer>
   );
 };
 

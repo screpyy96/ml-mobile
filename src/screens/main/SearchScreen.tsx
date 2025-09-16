@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, ActivityIndicator, Alert, Image, TouchableOpacity, TextInput, Text, FlatList, Linking, Modal, Pressable, Animated, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, ActivityIndicator, Alert, Text, FlatList, TouchableOpacity, Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { colors } from '../../constants/colors';
-import { categories } from '../../constants/categories';
 import { supabase } from '../../config/supabase';
-import { useTheme, Button, Input, SkeletonList, Avatar } from '../../design-system';
+import { useTheme, Button, Input, SkeletonList } from '../../design-system';
 import { SearchStackParamList } from '../../navigation/MainNavigator';
 import { useAuth } from '../../context/AuthContext';
+import { Screen } from '../../design-system/components/Layout/Screen';
+import { useSearchFilters } from './SearchScreen/hooks/useSearchFilters';
+import { useSearchQuery } from './SearchScreen/hooks/useSearchQuery';
+import { FilterSheet } from './SearchScreen/components/FilterSheet';
+import { MeseriasCard } from './SearchScreen/components/MeseriasCard';
 
 type SearchScreenNavigationProp = StackNavigationProp<SearchStackParamList, 'SearchIndex'>;
 
@@ -24,28 +28,60 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
   const navigation = useNavigation<SearchScreenNavigationProp>();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+  // Custom hooks
+  const { searchQuery, setSearchQuery, applySearchFilter, normalizeSearchTerm } = useSearchQuery();
+  const {
+    verifiedOnly,
+    minRating,
+    selectedCategories,
+    hasActiveFilters,
+    setVerifiedOnly,
+    setMinRating,
+    setSelectedCategories,
+    resetFilters,
+    applyFilters,
+  } = useSearchFilters();
+  
+  // State
   const [meserias, setMeserias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(true);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  
+  // Constants
   const PAGE_SIZE = 10;
   
-  // Filter sheet state
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [minRating, setMinRating] = useState<number | null>(null);
-  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  // Animations
+  const fadeAnimation = useState(new Animated.Value(0))[0];
+  const slideAnimation = useState(new Animated.Value(50))[0];
   const sheetAnim = useState(new Animated.Value(0))[0];
   
   // Check if search should be hidden (when accessed from drawer)
   // For now, always show search - we'll handle drawer navigation differently
   const hideSearch = false;
+  
+  // Initialize animations
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnimation, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnimation, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
-  // Fetch meseriași from database
+  // Fetch meseriași from database using web platform approach
   const fetchMeserias = async (pageParam = 0, isLoadMore = false) => {
     try {
       if (isLoadMore) {
@@ -54,34 +90,29 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
         setLoading(true);
       }
       setError(null);
+      const endLoading = () => {
+        if (isLoadMore) setLoadingMore(false); else setLoading(false);
+      };
 
-      // Base query - similar cu website-ul
+      // Base query using profiles table (like web platform)
       let query = supabase
         .from('profiles')
         .select('id, name, email, bio, address, avatar_url, rating, is_verified, is_pro, phone', { count: 'exact' })
         .eq('role', 'worker')
         .eq('is_verified', true);
 
-      // Apply search term filter (tokenized across multiple fields)
+      // Apply search term filter if provided
       if (searchQuery.trim()) {
-        // Normalize natural phrases like "caut zugrav in suceava" → "zugrav suceava"
-        const raw = String(searchQuery)
-          .trim()
-          .replace(/^caut(\s+un|\s+o|\s+)/i, '')
-          .replace(/^(găsește|gaseste|gasesc)(\s+)/i, '')
-          .replace(/^vreau\s+să\s+caut\s+/i, '')
-          .replace(/^vreau\s+sa\s+caut\s+/i, '')
-          .replace(/\b(in|în)\b/gi, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const raw = normalizeSearchTerm(searchQuery);
         const tokens = raw.split(/\s+/).filter(Boolean);
-
-        // If numeric-ish, also try direct phone match
+        
+        // Check for phone number search
         const phoneDigits = raw.replace(/\D+/g, '');
         if (phoneDigits.length >= 4) {
           query = query.or(`phone.ilike.%${phoneDigits}%`);
         }
 
+        // Apply token-based search across multiple fields
         for (const token of tokens) {
           const safeToken = token.replace(/[,()]/g, '');
           query = query.or(
@@ -90,15 +121,8 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
         }
       }
 
-      // Apply category filter if selected
-      if (selectedCategory) {
-        // We'll filter by trades after fetching
-      }
-
-      // Add order for consistent results
+      // Add consistent ordering and pagination
       query = query.order('created_at', { ascending: false });
-
-      // Apply pagination
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       query = query.range(from, to);
@@ -106,51 +130,58 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
       const { data, error: fetchError, count } = await query;
 
       if (fetchError) {
+        if (fetchError.code === 'PGRST103') {
+          setMeserias(isLoadMore ? prev => prev : []);
+          setHasNextPage(false);
+          setPage(pageParam);
+          endLoading();
+          return;
+        }
         throw fetchError;
       }
 
       if (!data || data.length === 0) {
-        setMeserias([]);
+        setMeserias(isLoadMore ? prev => prev : []);
+        setHasNextPage(false);
+        setPage(pageParam);
+        endLoading();
         return;
       }
 
-      // --- Advanced Sorting Logic ---
-      // 1. Get the IDs of workers on the current page who have trades.
-      const workerIdsOnPage = data.map(d => d.id);
-      
+      // --- Enrich with trades from worker_trades (web platform approach) ---
+      const workerIdsOnPage = data.map((d: any) => d.id);
       const { data: tradesOnPage } = await supabase
         .from('worker_trades')
         .select('profile_id, trade_ids')
         .in('profile_id', workerIdsOnPage);
-      
-      // 2. Fetch trade details for all workers
-      const allTradeIds = new Set();
-      tradesOnPage?.forEach(wt => {
+
+      // Gather all trade IDs from worker_trades
+      const allTradeIds = new Set<number>();
+      tradesOnPage?.forEach((wt: any) => {
         if (wt.trade_ids && Array.isArray(wt.trade_ids)) {
           wt.trade_ids.forEach((id: number) => allTradeIds.add(id));
         }
       });
 
+      // Fetch trade details
       const { data: tradeDetails } = await supabase
         .from('trades')
-        .select('id, name, slug')
+        .select('id, name, slug, category')
         .in('id', Array.from(allTradeIds));
 
       // Create a map of trade details
       const tradeMap = new Map();
-      tradeDetails?.forEach(trade => {
+      tradeDetails?.forEach((trade: any) => {
         tradeMap.set(trade.id, trade);
       });
 
       // Add trades to each worker
-      const workersWithTrades = data.map(worker => {
-        const workerTrades = tradesOnPage?.find(wt => wt.profile_id === worker.id);
+      const workersWithTrades = data.map((worker: any) => {
+        const workerTrades = tradesOnPage?.find((wt: any) => wt.profile_id === worker.id);
         
         const trades = workerTrades?.trade_ids?.map((tradeId: number) => {
           const trade = tradeMap.get(tradeId);
-          if (!trade) {
-            return null;
-          }
+          if (!trade) return null;
           return trade;
         }).filter(Boolean) || [];
         
@@ -158,24 +189,24 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
         let enrichedTrades = trades;
         if (enrichedTrades.length === 0 && worker.bio) {
           const bio = String(worker.bio).toLowerCase();
-          const inferred: { id: number; name: string; slug: string }[] = [];
+          const inferred: { id: number; name: string; slug: string; category?: string }[] = [];
           const candidates = [
-            { name: 'electrician', slug: 'electrician' },
-            { name: 'instalator', slug: 'instalator' },
-            { name: 'zugrav', slug: 'zugrav' },
-            { name: 'parchet', slug: 'parchet' },
-            { name: 'glet', slug: 'glet' },
-            { name: 'faianță', slug: 'faianta' },
-            { name: 'faianta', slug: 'faianta' },
-            { name: 'gresie', slug: 'gresie' },
-            { name: 'tâmplar', slug: 'tamplar' },
-            { name: 'tamplar', slug: 'tamplar' },
-            { name: 'zugrăvit', slug: 'zugravit' },
-            { name: 'zugravit', slug: 'zugravit' },
+            { name: 'electrician', slug: 'electrician', category: 'Instalații' },
+            { name: 'instalator', slug: 'instalator', category: 'Instalații' },
+            { name: 'zugrav', slug: 'zugrav', category: 'Finisaje' },
+            { name: 'parchet', slug: 'parchet', category: 'Finisaje' },
+            { name: 'glet', slug: 'glet', category: 'Finisaje' },
+            { name: 'faianță', slug: 'faianta', category: 'Finisaje' },
+            { name: 'faianta', slug: 'faianta', category: 'Finisaje' },
+            { name: 'gresie', slug: 'gresie', category: 'Finisaje' },
+            { name: 'tâmplar', slug: 'tamplar', category: 'Tâmplărie' },
+            { name: 'tamplar', slug: 'tamplar', category: 'Tâmplărie' },
+            { name: 'zugrăvit', slug: 'zugravit', category: 'Finisaje' },
+            { name: 'zugravit', slug: 'zugravit', category: 'Finisaje' },
           ];
           for (const c of candidates) {
             if (bio.includes(c.name) && inferred.length < 3) {
-              inferred.push({ id: -1, name: c.name, slug: c.slug });
+              inferred.push({ id: -1, name: c.name, slug: c.slug, category: c.category });
             }
           }
           enrichedTrades = inferred.length > 0 ? inferred : enrichedTrades;
@@ -203,13 +234,58 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
         return (b.rating || 0) - (a.rating || 0);
       });
 
-      // 4. Apply category filter if selected
+      // 4. Apply client-side filtering for better multi-token relevance
       let filteredResults = workersWithTrades;
-      if (selectedCategory) {
-        filteredResults = workersWithTrades.filter(worker => {
-          return worker.trades?.some((trade: any) => 
-            trade.name?.toLowerCase().includes(selectedCategory.toLowerCase())
+      
+      if (searchQuery.trim()) {
+        const tokens = normalizeSearchTerm(searchQuery).split(/\s+/).filter(Boolean);
+        const phoneDigits = searchQuery.replace(/\D+/g, '');
+
+        const tokenMatchesWorker = (w: any, token: string) => {
+          const inBasic = (
+            (w.name && w.name.toLowerCase().includes(token)) ||
+            (w.bio && w.bio.toLowerCase().includes(token)) ||
+            (w.address && w.address.toLowerCase().includes(token))
           );
+          const inTrades = Array.isArray(w.trades) && w.trades.some((t: any) => {
+            const name = typeof t === 'string' ? t : t?.name;
+            return name && String(name).toLowerCase().includes(token);
+          });
+          return inBasic || inTrades;
+        };
+
+        const matchesPhone = (w: any, digits: string) => {
+          if (!digits || digits.length < 4) return false;
+          const wDigits = String(w.phone || '').replace(/\D+/g, '');
+          return wDigits.includes(digits);
+        };
+
+        const searchFiltered = filteredResults.filter(w => {
+          const allTokensMatch = tokens.every(t => tokenMatchesWorker(w, t));
+          const phoneOk = phoneDigits.length >= 4 ? matchesPhone(w, phoneDigits) : true;
+          return allTokensMatch && phoneOk;
+        });
+
+        // If filtering removed all results, keep original to avoid empty pages
+        if (searchFiltered.length > 0) {
+          filteredResults = searchFiltered;
+        }
+      }
+      
+      // Apply additional filters (these are applied after search to maintain consistency)
+      if (verifiedOnly) {
+        filteredResults = filteredResults.filter((w: any) => w.is_verified);
+      }
+      if (minRating != null) {
+        filteredResults = filteredResults.filter((w: any) => Number(w.rating || 0) >= minRating);
+      }
+      if (selectedCategories.size > 0) {
+        filteredResults = filteredResults.filter((worker: any) => {
+          if (!worker.trades || worker.trades.length === 0) return false;
+          return worker.trades.some((t: any) => {
+            const category = t.category || 'Altele';
+            return selectedCategories.has(String(category));
+          });
         });
       }
 
@@ -225,7 +301,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
       }
 
       // Update pagination state
-      const hasNextPage = (count || 0) > from + (data?.length || 0);
+      const hasNextPage = (count || 0) > from + data.length;
       setHasNextPage(hasNextPage);
       setPage(pageParam);
     } catch (err) {
@@ -241,194 +317,99 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
     }
   };
 
-  // Fetch meseriași on component mount and when filters change
+  // Load available categories from trades table (unique list)
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trades')
+          .select('category')
+          .not('category', 'is', null);
+        if (!error && data) {
+          const set = new Set<string>();
+          data.forEach((row: any) => { if (row.category) set.add(row.category); });
+          setAllCategories(Array.from(set).sort());
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    loadCategories();
+  }, []);
+
+  // Fetch meseriași on component mount and when search changes
   useEffect(() => {
     setPage(0);
     setHasNextPage(true);
     fetchMeserias(0, false);
-  }, [selectedCategory, searchQuery]);
+  }, [searchQuery]);
+  
+  // Reset pagination when filters change
+  useEffect(() => {
+    if (meserias.length > 0) {
+      setPage(0);
+    }
+  }, [verifiedOnly, minRating, selectedCategories]);
 
   // Load more function
   const loadMore = () => {
-    if (!loadingMore && hasNextPage) {
+    if (!loadingMore && hasNextPage && filteredMeserias.length > 0) {
       fetchMeserias(page + 1, true);
     }
   };
 
-  // Filter meseriași based on search query (client-side filtering for better relevance)
-  const filteredMeserias = meserias.filter(meserias => {
-    if (!searchQuery.trim()) return true;
-    
-    const query = searchQuery.toLowerCase();
-    const trades = meserias.trades?.map((trade: any) => trade.name).join(' ') || '';
-    
-    return (
-      meserias.name?.toLowerCase().includes(query) ||
-      trades.toLowerCase().includes(query) ||
-      meserias.address?.toLowerCase().includes(query) ||
-      meserias.bio?.toLowerCase().includes(query) ||
-      meserias.phone?.toLowerCase().includes(query)
-    );
-  }).filter(m => {
-    // Apply advanced filters (client-side)
-    if (verifiedOnly && !m.is_verified) return false;
-    if (minRating != null && Number(m.rating || 0) < minRating) return false;
-    if (selectedCats.size > 0) {
-      const tradeIds = (m.trades || []).map((t: any) => String(t.id));
-      const intersects = tradeIds.some((id: string) => selectedCats.has(id));
-      if (!intersects) return false;
-    }
-    return true;
-  });
+  // Filter meseriași based on search query and filters
+  const filteredMeserias = useMemo(() => {
+    let filtered = applySearchFilter(meserias);
+    filtered = applyFilters(filtered);
+    return filtered;
+  }, [meserias, searchQuery, verifiedOnly, minRating, selectedCategories, applySearchFilter, applyFilters]);
 
-  const renderTradeChips = (trades: any[] = []) => {
-    if (!trades || trades.length === 0) return null;
-    const visible = trades.slice(0, 3);
-    const extra = trades.length - visible.length;
-    return (
-      <View style={styles.tradeChipsRow}>
-        {visible.map((t: any) => (
-          <View key={t.id || t.name} style={styles.tradeChip}>
-            <Text style={styles.tradeChipText}>{t.name}</Text>
-          </View>
-        ))}
-        {extra > 0 && (
-          <View style={[styles.tradeChip, styles.tradeChipExtra]}>
-            <Text style={[styles.tradeChipText, { color: '#0f172a' }]}>+{extra}</Text>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  const renderWorkerCard = useCallback(({ item: m }: { item: any }) => (
-    <TouchableOpacity 
-      key={m.id}
-      style={[styles.meseriasCard, { backgroundColor: theme.colors.background.primary }]}
-      activeOpacity={0.85}
-      onPress={() => navigation.navigate('MeseriasProfile', { meseriasId: m.id, meseriasData: m })}
-    >
-      {/* Header: Avatar mare + Nume + badge verificat */}
-      <View style={styles.headerRow}>
-        {m.avatar_url ? (
-          <Image source={{ uri: m.avatar_url }} style={styles.avatarLarge} />
-        ) : (
-          <View style={[styles.avatarLarge, styles.avatarLargeFallback, { backgroundColor: theme.colors.primary[500] }]}>
-            <Text style={styles.avatarLargeText}>{m.name?.charAt(0)?.toUpperCase() || 'M'}</Text>
-          </View>
-        )}
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[styles.meseriasNameLarge, { color: theme.colors.text.primary }]} numberOfLines={1}>
-            {m.name || 'Meseriaș'}
-          </Text>
-          {m.is_verified && (
-            <View style={styles.verifiedPill}>
-              <Text style={styles.verifiedIcon}>✔︎</Text>
-              <Text style={styles.verifiedText}>VERIFICAT</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Address pill */}
-      {m.address ? (
-        <View style={styles.addressPill}>
-          <Text style={styles.addressIcon}>📍</Text>
-          <Text style={styles.addressText} numberOfLines={1}>{m.address}</Text>
-        </View>
-      ) : null}
-
-      {/* Bio bubble */}
-      {m.bio ? (
-        <View style={styles.bioBubble}>
-          <Text style={styles.bioText} numberOfLines={3}>{m.bio}</Text>
-        </View>
-      ) : null}
-
-      {/* Trades chips */}
-      {renderTradeChips(m.trades)}
-
-      {/* Footer: Meta (rating, recenzii, locație) + Vezi profil */}
-      <View style={styles.meseriasFooter}>
-        <View style={styles.meseriasMetaRow}>
-          <Text style={[styles.ratingText, { color: theme.colors.text.primary }]}>
-            ⭐ {m.rating ? Number(m.rating).toFixed(1) : '4.5'}
-          </Text>
-          <Text style={[styles.reviewCount, { color: theme.colors.text.secondary }]}>• 0 recenzii</Text>
-          <Text style={[styles.meseriasLocation, { color: theme.colors.text.secondary }]}>• 📍 {m.address || 'București'}</Text>
-        </View>
-      </View>
-
-      {/* CTA buttons full-width */}
-      <View style={styles.ctaColumn}>
-        <Button
-          title="Vezi Profilul"
-          fullWidth
-          size="large"
-          onPress={() => navigation.navigate('MeseriasProfile', { meseriasId: m.id, meseriasData: m })}
-          style={{ backgroundColor: '#0F172A', borderRadius: 20 }}
-          textStyle={{ color: '#fff', fontWeight: '700' }}
-        />
-        <Button
-          title="Sună Acum"
-          fullWidth
-          size="large"
-          leftIcon="phone"
-          onPress={() => m.phone && Linking.openURL(`tel:${m.phone}`)}
-          style={{ backgroundColor: theme.colors.accent.green, borderRadius: 20 }}
-          textStyle={{ color: '#fff', fontWeight: '700' }}
-        />
-      </View>
-    </TouchableOpacity>
-  ), [navigation, theme.colors]);
+  const renderWorkerCard = useCallback(({ item: meserias }: { item: any }) => (
+    <MeseriasCard 
+      key={meserias.id}
+      meserias={meserias}
+      onPress={() => navigation.navigate('MeseriasProfile', { meseriasId: meserias.id, meseriasData: meserias })}
+    />
+  ), [navigation]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
 
   const ListHeader = useMemo(() => (
-    <>
-      {!hideSearch && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>Categorii</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryChip,
-                  selectedCategory === category.id 
-                    ? { backgroundColor: theme.colors.primary[500], borderColor: theme.colors.primary[500] }
-                    : { backgroundColor: theme.colors.background.primary, borderColor: 'rgba(0,0,0,0.1)' }
-                ]}
-                onPress={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={[
-                  styles.categoryChipText,
-                  { color: selectedCategory === category.id ? '#ffffff' : theme.colors.text.primary }
-                ]}>
-                  {category.icon} {category.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {user?.userType === 'meserias' ? 'Meseriași în zona ta' : 'Meșteșugari în zona ta'}
-        </Text>
-      </View>
-    </>
-  ), [hideSearch, selectedCategory, theme.colors, user?.userType]);
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>
+        {user?.userType === 'meserias' ? 'Meseriași în zona ta' : 'Meșteșugari în zona ta'}
+      </Text>
+    </View>
+  ), [user?.userType]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background.secondary }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.background.primary }]}>
-        <Text style={[styles.title, { color: theme.colors.text.primary }]}>
+    // Apply bottom safe area globally; handle top safe area on the header itself
+    <Screen edges={['bottom']} backgroundColor={theme.colors.background.secondary}>
+      <Animated.View 
+        style={[
+          styles.header,
+          { 
+            backgroundColor: theme.colors.primary[500], 
+            paddingTop: insets.top + 24,
+            opacity: fadeAnimation,
+            transform: [{ translateY: slideAnimation }]
+          }
+        ]}
+      >
+        <Text style={[styles.title, { color: theme.colors.text.inverse }]}>
           {user?.userType === 'meserias' ? 'Alți meseriași' : 'Căutare meșteșugari'}
         </Text>
         {!hideSearch && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Animated.View 
+            style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              gap: 16,
+              opacity: fadeAnimation,
+              transform: [{ translateY: slideAnimation }]
+            }}
+          >
             <View style={{ flex: 1 }}>
               <Input
                 variant="search"
@@ -439,18 +420,18 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
               />
             </View>
             <TouchableOpacity
-              style={styles.filterButton}
+              style={[styles.filterButton, { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderColor: 'rgba(255, 255, 255, 0.3)' }]}
               activeOpacity={0.8}
               onPress={() => {
                 setFiltersOpen(true);
                 Animated.timing(sheetAnim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
               }}
             >
-              <Text style={styles.filterIcon}>⚙️</Text>
+              <Text style={[styles.filterIcon, { color: theme.colors.text.inverse }]}>⚙️</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
-      </View>
+      </Animated.View>
       {loading ? (
         <View style={styles.section}>
           <SkeletonList itemCount={5} itemHeight={120} showAvatar showTitle showSubtitle />
@@ -478,70 +459,25 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ route }) => {
         />
       )}
 
-      {/* Filter Bottom Sheet */}
-      <Modal visible={filtersOpen} transparent animationType="none" onRequestClose={() => setFiltersOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => {
+      <FilterSheet
+        visible={filtersOpen}
+        onClose={() => {
           Animated.timing(sheetAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setFiltersOpen(false));
-        }} />
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: sheetAnim.interpolate({ inputRange: [0,1], outputRange: [400,0] }) }] }]}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Filtrează rezultate</Text>
-
-          {/* Verified toggle */}
-          <View style={styles.sheetRowBetween}>
-            <Text style={styles.sheetLabel}>Doar verificate</Text>
-            <TouchableOpacity
-              onPress={() => setVerifiedOnly(v => !v)}
-              style={[styles.toggle, verifiedOnly && styles.toggleOn]}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.knob, verifiedOnly && styles.knobOn]} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Min rating */}
-          <Text style={[styles.sheetLabel, { marginTop: 12 }]}>Rating minim</Text>
-          <View style={styles.segmentRow}>
-            {[3, 4, 4.5].map(r => (
-              <TouchableOpacity key={r} onPress={() => setMinRating(minRating === r ? null : r)} activeOpacity={0.8}
-                style={[styles.segment, minRating === r && styles.segmentActive]}
-              >
-                <Text style={[styles.segmentText, minRating === r && styles.segmentTextActive]}>⭐ {r}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Categories multi-select */}
-          <Text style={[styles.sheetLabel, { marginTop: 12 }]}>Categorii</Text>
-          <View style={styles.sheetChipsWrap}>
-            {categories.map(cat => {
-              const selected = selectedCats.has(cat.id);
-              return (
-                <TouchableOpacity key={cat.id} onPress={() => {
-                  setSelectedCats(prev => {
-                    const next = new Set(prev);
-                    if (selected) next.delete(cat.id); else next.add(cat.id);
-                    return next;
-                  });
-                }} style={[styles.sheetChip, selected && styles.sheetChipActive]} activeOpacity={0.8}>
-                  <Text style={[styles.sheetChipText, selected && styles.sheetChipTextActive]}>{cat.icon} {cat.name}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Actions */}
-          <View style={{ marginTop: 8, gap: 10 }}>
-            <Button title="Aplică filtre" fullWidth size="large" onPress={() => {
-              Animated.timing(sheetAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setFiltersOpen(false));
-            }} />
-            <Button title="Resetează" fullWidth size="large" variant="outline" onPress={() => {
-              setVerifiedOnly(false); setMinRating(null); setSelectedCats(new Set()); setSelectedCategory(null);
-            }} />
-          </View>
-        </Animated.View>
-      </Modal>
-    </SafeAreaView>
+        }}
+        sheetAnim={sheetAnim}
+        verifiedOnly={verifiedOnly}
+        setVerifiedOnly={setVerifiedOnly}
+        minRating={minRating}
+        setMinRating={setMinRating}
+        selectedCategories={selectedCategories}
+        setSelectedCategories={setSelectedCategories}
+        allCategories={allCategories}
+        onApplyFilters={() => {
+          Animated.timing(sheetAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setFiltersOpen(false));
+        }}
+        onResetFilters={resetFilters}
+      />
+    </Screen>
   );
 };
 
@@ -551,23 +487,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    padding: 24,
-    backgroundColor: '#ffffff',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    backgroundColor: '#fff', // Added for shadow optimization
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
-    color: colors.text,
     marginBottom: 24,
     letterSpacing: -0.5,
   },
@@ -575,16 +511,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#EEF2FF',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#C7D2FE'
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    backgroundColor: '#fff', // Added for shadow optimization
   },
-  filterIcon: { fontSize: 18 },
+  filterIcon: { fontSize: 20 },
   searchInput: {
     fontSize: 16,
     padding: 0,
@@ -603,75 +543,75 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     marginLeft: 4,
   },
-  categoriesContainer: {
-    flexDirection: 'row',
-  },
-  categoryChip: {
-    marginRight: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  categoryChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  // categories section removed; using filter sheet instead
   meseriasCard: {
     marginBottom: 20,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     borderRadius: 24,
-    padding: 16,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 6,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  avatarLarge: { width: 72, height: 72, borderRadius: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  avatarLarge: { width: 76, height: 76, borderRadius: 20 },
   avatarLargeFallback: { justifyContent: 'center', alignItems: 'center' },
-  avatarLargeText: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  meseriasNameLarge: { fontSize: 22, fontWeight: '800' },
+  avatarLargeText: { color: '#fff', fontSize: 30, fontWeight: '800' },
+  meseriasNameLarge: { fontSize: 24, fontWeight: '800' },
   verifiedPill: {
-    marginTop: 6,
+    marginTop: 8,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#A7F3D0'
+    borderColor: '#A7F3D0',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   verifiedIcon: { color: '#059669', fontSize: 14 },
   verifiedText: { color: '#065F46', fontWeight: '700', fontSize: 12, letterSpacing: 0.3 },
   addressPill: {
-    marginTop: 6,
+    marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0'
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   addressIcon: { fontSize: 12, marginRight: 6 },
   addressText: { fontSize: 13, color: '#0f172a', fontWeight: '600' },
   bioBubble: {
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 20,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0'
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   bioText: { fontSize: 14, color: '#0f172a' },
   meseriasHeader: {
@@ -730,10 +670,10 @@ const styles = StyleSheet.create({
   },
   verifiedDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' },
   tradeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  tradeChip: { backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16 },
+  tradeChip: { backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
   tradeChipText: { fontSize: 13, color: '#1e293b', fontWeight: '600' },
   tradeChipExtra: { backgroundColor: '#E2E8F0', borderColor: '#CBD5E1' },
-  ctaColumn: { marginTop: 12, gap: 12 },
+  ctaColumn: { marginTop: 16, gap: 14 },
   meseriasCategory: {
     fontSize: 14,
     color: colors.primary,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, Image } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { supabase } from '../../config/supabase';
@@ -44,7 +44,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen backgroundColor={colors.background}>
       <View style={styles.content}>
         <View style={styles.header}>
           <Image 
@@ -91,7 +91,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
           </Button>
         </View>
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

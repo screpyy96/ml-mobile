@@ -4,23 +4,38 @@
  */
 
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  Dimensions,
-  ScrollView,
-  Image,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Dimensions, ScrollView, Image, InteractionManager } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../themes/ThemeProvider';
 import { useAuth } from '../../../context/AuthContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 const DRAWER_HEIGHT = screenHeight * 0.7;
+
+// Map legacy MaterialIcons names to MaterialCommunityIcons
+const mapIcon = (name: string): string => {
+  const map: Record<string, string> = {
+    home: 'home-outline',
+    search: 'magnify',
+    dashboard: 'view-dashboard-outline',
+    people: 'account-group-outline',
+    assignment: 'clipboard-text-outline',
+    person: 'account-outline',
+    menu: 'menu',
+    work: 'briefcase-outline',
+    notifications: 'bell-outline',
+    star: 'star-outline',
+    message: 'message-text-outline',
+    settings: 'cog-outline',
+    help: 'help-circle-outline',
+    logout: 'logout',
+    favorite: 'heart-outline',
+    history: 'history',
+  };
+  return map[name] || name;
+};
 
 interface DrawerItem {
   key: string;
@@ -38,7 +53,7 @@ interface DrawerNavigatorProps {
   currentRoute: string;
 }
 
-export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
+export const DrawerNavigator: React.FC<DrawerNavigatorProps> = React.memo(({
   isOpen,
   onClose,
   onOpen,
@@ -61,31 +76,31 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
           key: 'home',
           label: 'Acasă',
           icon: 'home',
-          route: 'HomeStack',
+          route: 'Home',
         },
         {
           key: 'search',
-          label: 'Joburi',
-          icon: 'search',
-          route: 'JobsStack',
-        },
-        {
-          key: 'meserias',
           label: 'Meseriași',
           icon: 'people',
-          route: 'SearchStack',
+          route: 'Search',
         },
         {
           key: 'dashboard',
           label: 'Dashboard',
           icon: 'dashboard',
-          route: 'DashboardStack',
+          route: 'Dashboard',
         },
         {
-          key: 'profile',
+          key: 'messages',
+          label: 'Mesaje',
+          icon: 'message',
+          route: 'Messages',
+        },
+        {
+          key: 'menu',
           label: 'Meniu',
           icon: 'menu',
-          route: 'ProfileStack',
+          route: 'Menu',
         },
       ];
     } else {
@@ -95,37 +110,37 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
           key: 'home',
           label: 'Acasă',
           icon: 'home',
-          route: 'HomeStack',
+          route: 'Home',
         },
         {
           key: 'search',
           label: 'Meșeriași',
           icon: 'search',
-          route: 'SearchStack',
+          route: 'Search',
         },
         {
           key: 'dashboard',
-          label: 'Cere ofertă',
-          icon: 'add-circle-outline',
-          route: 'DashboardStack',
-        },
-        {
-          key: 'jobs',
           label: 'Cereri',
           icon: 'assignment',
-          route: 'JobsStack',
+          route: 'Dashboard',
         },
         {
-          key: 'profile',
+          key: 'messages',
+          label: 'Mesaje',
+          icon: 'message',
+          route: 'Messages',
+        },
+        {
+          key: 'menu',
           label: 'Meniu',
           icon: 'menu',
-          route: 'ProfileStack',
+          route: 'Menu',
         },
       ];
     }
   };
 
-  const drawerItems = getDrawerItems();
+  const drawerItems = React.useMemo(() => getDrawerItems(), [user?.userType]);
 
   // Menu items based on user type
   const getMenuItems = (): DrawerItem[] => {
@@ -136,153 +151,152 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
           key: 'dashboard',
           label: 'Dashboard',
           icon: 'dashboard',
-          route: 'DashboardStack',
+          route: 'WorkerDashboard',
         },
         {
-          key: 'jobs',
-          label: 'Joburile mele',
-          icon: 'work',
-          route: 'JobsStack',
+          key: 'profile-public',
+          label: 'Profil Public',
+          icon: 'person',
+          route: 'Profile',
         },
         {
-          key: 'meserias',
-          label: 'Alți meseriași',
-          icon: 'people',
-          route: 'SearchStack',
-        },
-        {
-          key: 'earnings',
-          label: 'Câștigurile mele',
-          icon: 'account-balance-wallet',
-          route: 'EarningsStack',
+          key: 'contacts-unblock',
+          label: 'Contacte Deblocate',
+          icon: 'contacts',
+          route: 'Dashboard',
         },
         {
           key: 'reviews',
-          label: 'Recenziile mele',
+          label: 'Recenziile Mele',
           icon: 'star',
-          route: 'ReviewsStack',
+          route: 'Reviews',
         },
         {
-          key: 'notifications',
-          label: 'Notificări',
-          icon: 'notifications',
-          route: 'NotificationsStack',
-          badge: 3,
-        },
-        {
-          key: 'messages',
-          label: 'Mesaje',
-          icon: 'message',
-          route: 'MessagesStack',
-          badge: 5,
-        },
-        {
-          key: 'profile',
-          label: 'Profilul meu',
-          icon: 'person',
-          route: 'ProfileStack',
+          key: 'requests',
+          label: 'Cererile Mele',
+          icon: 'favorite',
+          route: 'SavedJobs',
         },
         {
           key: 'subscription',
           label: 'Abonament',
-          icon: 'star',
-          route: 'SubscriptionStack',
+          icon: 'card_membership',
+          route: 'Subscription',
         },
         {
           key: 'settings',
           label: 'Setări',
           icon: 'settings',
-          route: 'SettingsStack',
+          route: 'Settings',
         },
         {
-          key: 'help',
-          label: 'Ajutor',
-          icon: 'help',
-          route: 'HelpStack',
+          key: 'notifications',
+          label: 'Notificări',
+          icon: 'notifications',
+          route: 'Notifications',
         },
         {
-          key: 'logout',
-          label: 'Deconectare',
-          icon: 'logout',
-          route: 'LogoutStack',
+          key: 'meserias',
+          label: 'Meșeriași',
+          icon: 'search',
+          route: 'Search',
+        },
+        {
+          key: 'applications',
+          label: 'Solicitări',
+          icon: 'assignment',
+          route: 'Applications',
+        },
+        {
+          key: 'services',
+          label: 'Servicii',
+          icon: 'build',
+          route: 'Dashboard',
         },
       ];
     } else {
       // Client menu items
       return [
         {
-          key: 'requests',
-          label: 'Cererile mele',
-          icon: 'assignment',
-          route: 'RequestsStack',
+          key: 'dashboard',
+          label: 'Dashboard',
+          icon: 'dashboard',
+          route: 'Dashboard',
         },
         {
-          key: 'saved',
-          label: 'Meseriași salvați',
-          icon: 'favorite',
-          route: 'SavedStack',
-        },
-        {
-          key: 'history',
-          label: 'Istoric lucrări',
-          icon: 'history',
-          route: 'HistoryStack',
-        },
-        {
-          key: 'notifications',
-          label: 'Notificări',
-          icon: 'notifications',
-          route: 'NotificationsStack',
-          badge: 2,
-        },
-        {
-          key: 'messages',
-          label: 'Mesaje',
-          icon: 'message',
-          route: 'MessagesStack',
-          badge: 1,
-        },
-        {
-          key: 'profile',
-          label: 'Profilul meu',
+          key: 'profile-public',
+          label: 'Profil Public',
           icon: 'person',
-          route: 'ProfileStack',
+          route: 'Profile',
+        },
+        {
+          key: 'contacts-unblock',
+          label: 'Contacte Deblocate',
+          icon: 'contacts',
+          route: 'Dashboard',
+        },
+        {
+          key: 'reviews',
+          label: 'Recenziile Mele',
+          icon: 'star',
+          route: 'Reviews',
+        },
+        {
+          key: 'requests',
+          label: 'Cererile Mele',
+          icon: 'favorite',
+          route: 'SavedJobs',
         },
         {
           key: 'subscription',
           label: 'Abonament',
-          icon: 'star',
-          route: 'SubscriptionStack',
+          icon: 'card_membership',
+          route: 'Subscription',
         },
         {
           key: 'settings',
           label: 'Setări',
           icon: 'settings',
-          route: 'SettingsStack',
+          route: 'Settings',
         },
         {
-          key: 'help',
-          label: 'Ajutor',
-          icon: 'help',
-          route: 'HelpStack',
+          key: 'notifications',
+          label: 'Notificări',
+          icon: 'notifications',
+          route: 'Notifications',
         },
         {
-          key: 'logout',
-          label: 'Deconectare',
-          icon: 'logout',
-          route: 'LogoutStack',
+          key: 'meserias',
+          label: 'Meșeriași',
+          icon: 'search',
+          route: 'Search',
+        },
+        {
+          key: 'applications',
+          label: 'Solicitări',
+          icon: 'assignment',
+          route: 'Applications',
+        },
+        {
+          key: 'services',
+          label: 'Servicii',
+          icon: 'build',
+          route: 'Dashboard',
         },
       ];
     }
   };
 
-  const menuItems = getMenuItems();
+  const menuItems = React.useMemo(() => getMenuItems(), [user?.userType]);
 
   // Defensive: if route changes while drawer is open, force-close it
   React.useEffect(() => {
     if (isOpen) {
       panY.setValue(0);
-      onClose();
+      // Use a timeout to ensure animations complete properly
+      setTimeout(() => {
+        onClose();
+      }, 50);
     }
   }, [currentRoute]);
 
@@ -314,7 +328,10 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        // Ensure overlay is completely hidden after animation
+        panY.setValue(0);
+      });
     }
   }, [isOpen]);
 
@@ -345,20 +362,26 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
   };
 
   const handleItemPress = (item: DrawerItem) => {
-    if (item.key === 'profile') {
+    if (item.key === 'menu') {
       // Toggle menu when Menu button is pressed
       if (isOpen) {
         // Reset pan and close
         panY.setValue(0);
+        slideAnim.setValue(DRAWER_HEIGHT);
+        fadeAnim.setValue(0);
         onClose();
       } else {
         onOpen();
       }
     } else {
-      // Close first, then navigate (ensures drawer hides immediately)
-      panY.setValue(0);
-      onClose();
-      onNavigate(item.route);
+      // Close first, then navigate after interactions to avoid overlay intercepting
+      if (isOpen) {
+        panY.setValue(0);
+        slideAnim.setValue(DRAWER_HEIGHT);
+        fadeAnim.setValue(0);
+        onClose();
+      }
+      InteractionManager.runAfterInteractions(() => onNavigate(item.route));
     }
   };
 
@@ -366,12 +389,24 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
     console.log('🔥 DrawerNavigator - Menu item pressed:', item.key, item.route);
     console.log('🔥 DrawerNavigator - Drawer is open:', isOpen);
     
-    // Close drawer immediately - this should trigger the animation via useEffect
+    // Close then navigate after interactions
     panY.setValue(0);
+    slideAnim.setValue(DRAWER_HEIGHT);
+    fadeAnim.setValue(0);
     onClose();
     
-    // Navigate immediately
-    onNavigate(item.route);
+    // Special handling for Profile route - navigate to Dashboard then Profile
+    if (item.route === 'Profile') {
+      InteractionManager.runAfterInteractions(() => {
+        onNavigate('Dashboard');
+        // Small delay to ensure Dashboard is loaded before navigating to Profile
+        setTimeout(() => {
+          onNavigate('Profile');
+        }, 100);
+      });
+    } else {
+      InteractionManager.runAfterInteractions(() => onNavigate(item.route));
+    }
   };
 
   return (
@@ -386,10 +421,16 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
               backgroundColor: 'rgba(0,0,0,0.5)',
             },
           ]}
+          pointerEvents={isOpen ? "auto" : "none"}
         >
           <TouchableOpacity
             style={styles.backdropTouch}
-            onPress={onClose}
+            onPress={() => {
+              panY.setValue(0);
+              slideAnim.setValue(DRAWER_HEIGHT);
+              fadeAnim.setValue(0);
+              onClose();
+            }}
             activeOpacity={1}
           />
         </Animated.View>
@@ -398,7 +439,7 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
       {/* Fixed Bottom Navigation */}
       <View style={[styles.bottomNavigation, { paddingBottom: insets.bottom }]}>
         {drawerItems.map((item) => {
-          const isActive = currentRoute === item.route || (item.key === 'profile' && isOpen);
+          const isActive = currentRoute === item.route || (item.key === 'menu' && isOpen);
           return (
             <TouchableOpacity
               key={item.key}
@@ -409,8 +450,8 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
               onPress={() => handleItemPress(item)}
               activeOpacity={0.7}
             >
-              <Icon
-                name={item.icon}
+              <MCIcon
+                name={mapIcon(item.icon)}
                 size={24}
                 color={isActive ? theme.colors.primary[500] : theme.colors.text.secondary}
               />
@@ -446,6 +487,7 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
               paddingBottom: insets.bottom + 20,
             },
           ]}
+          pointerEvents={isOpen ? "auto" : "none"}
         >
         {/* User Info */}
         <View style={styles.userSection}>
@@ -482,8 +524,8 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
-                  <Icon
-                    name={item.icon}
+                  <MCIcon
+                    name={mapIcon(item.icon)}
                     size={24}
                     color={theme.colors.text.secondary}
                   />
@@ -504,7 +546,12 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
         {/* Close Handle */}
         <TouchableOpacity 
           style={styles.closeHandle}
-          onPress={onClose}
+          onPress={() => {
+            panY.setValue(0);
+            slideAnim.setValue(DRAWER_HEIGHT);
+            fadeAnim.setValue(0);
+            onClose();
+          }}
           activeOpacity={0.7}
         >
           <View style={[styles.handleBar, { backgroundColor: theme.colors.text.secondary }]} />
@@ -513,7 +560,7 @@ export const DrawerNavigator: React.FC<DrawerNavigatorProps> = ({
       </PanGestureHandler>
     </>
   );
-};
+});
 
 const styles = {
   backdrop: {
@@ -523,6 +570,11 @@ const styles = {
     right: 0,
     bottom: 0,
     zIndex: 1000,
+    // Performance hints
+    // @ts-ignore
+    renderToHardwareTextureAndroid: true,
+    // @ts-ignore
+    shouldRasterizeIOS: true,
   },
   backdropTouch: {
     flex: 1,
@@ -532,23 +584,21 @@ const styles = {
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: '#ffffff', // Explicitly set for shadow optimization
+    borderTopWidth: 0,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 6,
     zIndex: 1001,
     flexDirection: 'row' as const,
     justifyContent: 'space-around' as const,
     alignItems: 'center' as const,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    // Ensure navigation blocks touch events
+    pointerEvents: 'auto' as const,
   },
   navButton: {
     alignItems: 'center' as const,
@@ -557,6 +607,8 @@ const styles = {
     borderRadius: 12,
     position: 'relative' as const,
     minWidth: 60,
+    // Ensure buttons block touch events from passing through
+    pointerEvents: 'auto' as const,
   },
   buttonLabel: {
     fontSize: 12,
@@ -588,15 +640,18 @@ const styles = {
     height: DRAWER_HEIGHT,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    backgroundColor: '#ffffff', // Added to optimize shadow rendering
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 12,
     zIndex: 1002,
+    // Performance hints
+    // @ts-ignore
+    renderToHardwareTextureAndroid: true,
+    // @ts-ignore
+    shouldRasterizeIOS: true,
   },
   userSection: {
     flexDirection: 'row' as const,

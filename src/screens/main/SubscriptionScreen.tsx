@@ -8,7 +8,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../constants/colors';
@@ -305,16 +305,16 @@ const SubscriptionScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen backgroundColor={colors.background}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Se încarcă...</Text>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen backgroundColor={colors.background}>
       <ScrollView
         style={styles.scrollView}
         refreshControl={
@@ -357,7 +357,7 @@ const SubscriptionScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Animated, Vibration, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { useAuth } from '../../context/AuthContext';
@@ -125,7 +125,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#f8fafc' }]}>
+    <Screen backgroundColor={'#f8fafc'}>
       <ScrollView contentContainerStyle={styles.content}>
         <Animated.View 
           style={[
@@ -324,7 +324,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Animated.View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

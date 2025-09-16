@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Dimensions, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -29,7 +29,7 @@ const HomeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background.primary }]}>
+    <Screen backgroundColor={theme.colors.background.primary}>
       <ScrollView 
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -139,7 +139,7 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

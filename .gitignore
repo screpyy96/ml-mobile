@@ -72,3 +72,27 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Cache
+.npm-cache/
+
+# Android build artifacts
+android/app/build/
+android/build/
+android/caches/
+android/daemon/
+android/native/
+
+# Android generated resources
+android/app/src/main/res/drawable/
+android/app/src/main/res/mipmap-*/
+android/app/src/main/res/values/colors.xml
+
+# iOS build artifacts
+ios/build/
+
+# iOS generated resources
+ios/MeseriasLocalAppNew/Images.xcassets/BootSplashLogo.imageset/
+
+# Logs
+*.log

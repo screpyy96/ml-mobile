@@ -27,11 +27,11 @@ export const useTheme = () => {
 };
 
 interface ThemeProviderProps {
+  initialTheme: 'light' | 'dark';
   children: React.ReactNode;
-  initialTheme?: 'light' | 'dark';
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, initialTheme }) => {
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({ initialTheme, children }) => {
   const colorScheme = useColorScheme();
   const [isDark, setIsDark] = useState(() =>
     initialTheme ? initialTheme === 'dark' : colorScheme === 'dark'
@@ -128,11 +128,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, initialT
     setTheme,
   };
 
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
 
 // Hook to get theme colors (shorthand)

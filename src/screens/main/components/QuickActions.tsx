@@ -26,6 +26,10 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate }) => {
           <Icon name="payment" size={24} color={colors.warning} />
           <Text style={styles.quickActionText}>Plăți</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.quickActionCard} onPress={() => onNavigate('Subscription')}>
+          <Icon name="star" size={24} color={colors.primary} />
+          <Text style={styles.quickActionText}>Abonament</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.quickActionCard} onPress={() => onNavigate('Settings')}>
           <Icon name="support-agent" size={24} color={colors.error} />
           <Text style={styles.quickActionText}>Suport</Text>

@@ -1,19 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  Alert,
-  ActivityIndicator,
-  StatusBar,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, ActivityIndicator, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../config/supabase';
 import { colors } from '../../constants/colors';
 import { JobRequest, Review, Notification } from '../../types';
+import { useNavigation } from '@react-navigation/native';
 
 import DashboardHeader from './components/DashboardHeader';
 import DashboardStats from './components/DashboardStats';
@@ -42,6 +36,7 @@ interface DashboardStatsData {
 
 const WorkerDashboardScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<any>();
   
   const [stats, setStats] = useState<DashboardStatsData>({
     totalJobs: 0,
@@ -394,6 +389,12 @@ const WorkerDashboardScreen: React.FC = () => {
     }
   };
 
+  const handleNavigate = (screen: string) => {
+    // Navigate to nested routes within WorkerDashboard stack
+    // Known screens: 'Jobs', 'Applications', 'SavedJobs', 'Settings', 'Subscription', 'Reviews'
+    navigation.navigate(screen as never);
+  };
+
   const renderOverview = () => {
     if (loading) {
       return (
@@ -407,6 +408,7 @@ const WorkerDashboardScreen: React.FC = () => {
     return (
       <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
         <DashboardStats stats={stats} />
+        <QuickActions onNavigate={handleNavigate} />
         <View style={styles.bottomSpacing} />
       </ScrollView>
     );
@@ -416,10 +418,14 @@ const WorkerDashboardScreen: React.FC = () => {
 
   
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
+    <Screen style={styles.container} edges={['top', 'left', 'right']} backgroundColor={colors.backgroundSecondary}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
-      <DashboardHeader userName={user?.name} notifications={notifications} />
+      <View style={{ paddingTop: insets.top }}>
+        <DashboardHeader userName={user?.name} notifications={notifications} />
+      </View>
 
       
 
@@ -432,7 +438,7 @@ const WorkerDashboardScreen: React.FC = () => {
       >
         {renderOverview()}
       </ScrollView>
-    </View>
+    </Screen>
   );
 };
 

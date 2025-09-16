@@ -15,7 +15,7 @@ export const createOptimizedShadow = (
   backgroundColor: string = 'white'
 ): ViewStyle => {
   return {
-    backgroundColor, // Required for efficient shadow calculation
+    backgroundColor: backgroundColor, // Ensure a solid background color is always set
     ...shadowStyle,
   };
 };

@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { 
   Image,
@@ -101,7 +101,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.primary[500] }]}>
+    <Screen backgroundColor={theme.colors.primary[500]}>
       <Animated.View 
         style={[
           styles.background,
@@ -158,7 +158,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </Animated.View>
       </Animated.View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

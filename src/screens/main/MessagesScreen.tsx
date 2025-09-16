@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Card, Avatar, Badge } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { colors } from '../../constants/colors';
 
 const MessagesScreen: React.FC = () => {
@@ -49,7 +49,7 @@ const MessagesScreen: React.FC = () => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen backgroundColor={colors.background}>
       <View style={styles.header}>
         <Text style={styles.title}>Mesaje</Text>
       </View>
@@ -104,7 +104,7 @@ const MessagesScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

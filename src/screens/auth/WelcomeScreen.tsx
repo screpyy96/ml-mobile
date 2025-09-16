@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { 
@@ -46,7 +46,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background.primary }]}>
+    <Screen backgroundColor={theme.colors.background.primary}>
       <Animated.View 
         style={[
           styles.content,
@@ -106,7 +106,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
           Find verified craftsmen quickly for any home improvement project
         </Text>
       </Animated.View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

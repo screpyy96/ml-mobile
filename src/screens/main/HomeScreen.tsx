@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Animated, TouchableOpacity, Text, Dimensions, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +31,7 @@ const { width: screenWidth } = Dimensions.get('window');
 const HomeScreen: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const showSuccessToast = useSuccessToast();
   const navigation = useNavigation();
 
@@ -236,6 +238,7 @@ const HomeScreen: React.FC = () => {
           styles.heroSection,
           {
             backgroundColor: theme.colors.primary[500],
+            paddingTop: 16 + insets.top,
             opacity: fadeAnimation,
             transform: [
               { translateY: slideAnimation },
@@ -461,6 +464,7 @@ const HomeScreen: React.FC = () => {
           styles.heroSection,
           {
             backgroundColor: theme.colors.primary[500],
+            paddingTop: 16 + insets.top,
             opacity: fadeAnimation,
             transform: [
               { translateY: slideAnimation },
@@ -474,8 +478,7 @@ const HomeScreen: React.FC = () => {
             <View style={styles.userInfo}>
               <Avatar
                 name={user?.name || 'User'}
-                size="medium"
-                online={true}
+                size="large"
                 style={styles.avatar}
               />
               <View style={styles.greetingText}>
@@ -507,30 +510,43 @@ const HomeScreen: React.FC = () => {
               </View>
             </View>
             
-            {/* Quick Stats Button */}
+            {/* Notification Button */}
             <TouchableOpacity
-              style={styles.quickCreateButton}
-              onPress={() => showSuccessToast('View stats pressed')}
+              style={[styles.notificationButton, { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}
+              onPress={() => showSuccessToast('Notifications pressed')}
             >
-              <Icon name="analytics" size={20} color={theme.colors.primary[500]} />
+              <Icon name="notifications" size={20} color={theme.colors.text.inverse} />
+              <View style={[styles.notificationBadge, { backgroundColor: theme.colors.accent.red }]}>
+                <Text style={[styles.notificationBadgeText, { color: theme.colors.text.inverse }]}>3</Text>
+              </View>
             </TouchableOpacity>
           </View>
 
-          {/* Status Badge */}
+          {/* Modern Status Card */}
           <Animated.View
             style={[
-              styles.statusBadge,
+              styles.statusCard,
               {
-                backgroundColor: theme.colors.accent.green,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 opacity: fadeAnimation,
                 transform: [{ scale: heroScaleAnimation }],
               }
             ]}
           >
-            <Icon name="check-circle" size={16} color={theme.colors.text.inverse} />
-            <Text style={[styles.statusText, { color: theme.colors.text.inverse }]}>
-              Disponibil pentru lucru
-            </Text>
+            <View style={styles.statusContent}>
+              <View style={[styles.statusIndicator, { backgroundColor: theme.colors.status.success }]} />
+              <View style={styles.statusTextContainer}>
+                <Text style={[styles.statusTitle, { color: theme.colors.text.primary }]}>
+                  Disponibil pentru lucru
+                </Text>
+                <Text style={[styles.statusSubtext, { color: theme.colors.text.secondary }]}>
+                  Ultima activitate: acum 5 min
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.statusToggle}>
+                <Icon name="toggle-on" size={24} color={theme.colors.status.success} />
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </View>
 
@@ -538,73 +554,95 @@ const HomeScreen: React.FC = () => {
         <View style={styles.heroPattern} />
       </Animated.View>
 
-      {/* Stats Cards */}
+      {/* Premium Stats Overview */}
       <Animated.View
         style={[
-          styles.statsContainer,
+          styles.statsOverviewContainer,
           {
             opacity: fadeAnimation,
             transform: [{ translateY: slideAnimation }],
           }
         ]}
       >
-        <Card
-          title=""
-          subtitle=""
-          variant="premium"
-          size="small"
-          containerStyle={{
-            ...styles.statCard,
-            backgroundColor: theme.colors.background.primary,
-            marginRight: 6,
-          }}
-        >
-          <View style={styles.statContent}>
-            <Icon name="work" size={24} color={theme.colors.primary[500]} />
-            <View style={styles.statTextContainer}>
-              <Text style={[styles.statTitle, { color: theme.colors.text.primary }]}>12</Text>
-              <Text style={[styles.statSubtitle, { color: theme.colors.text.secondary }]}>Lucrări Active</Text>
+        <View style={[styles.statsCard, { backgroundColor: theme.colors.background.primary }]}>
+          <View style={styles.statsHeader}>
+            <Text style={[styles.statsTitle, { color: theme.colors.text.primary }]}>Activitatea Ta</Text>
+            <TouchableOpacity>
+              <Text style={[styles.viewDetailsText, { color: theme.colors.primary[500] }]}>Detalii</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${theme.colors.primary[500]}15` }]}>
+                <Icon name="work" size={18} color={theme.colors.primary[500]} />
+              </View>
+              <Text style={[styles.statNumber, { color: theme.colors.text.primary }]}>{recentJobs.length}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.text.secondary }]}>Joburi Noi</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${theme.colors.accent.orange}15` }]}>
+                <Icon name="assignment" size={18} color={theme.colors.accent.orange} />
+              </View>
+              <Text style={[styles.statNumber, { color: theme.colors.text.primary }]}>12</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.text.secondary }]}>Aplicații</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${theme.colors.accent.green}15` }]}>
+                <Icon name="star" size={18} color={theme.colors.accent.green} />
+              </View>
+              <Text style={[styles.statNumber, { color: theme.colors.text.primary }]}>4.8</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.text.secondary }]}>Rating</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={[styles.statIconContainer, { backgroundColor: `${theme.colors.primary[300]}15` }]}>
+                <Icon name="trending-up" size={18} color={theme.colors.primary[300]} />
+              </View>
+              <Text style={[styles.statNumber, { color: theme.colors.text.primary }]}>+15%</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.text.secondary }]}>Creștere</Text>
             </View>
           </View>
-        </Card>
-        <Card
-          title=""
-          subtitle=""
-          variant="premium"
-          size="small"
-          containerStyle={{
-            ...styles.statCard,
-            backgroundColor: theme.colors.background.primary,
-            marginHorizontal: 6,
-          }}
-        >
-          <View style={styles.statContent}>
-            <Icon name="star" size={24} color={theme.colors.accent.orange} />
-            <View style={styles.statTextContainer}>
-              <Text style={[styles.statTitle, { color: theme.colors.text.primary }]}>4.8</Text>
-              <Text style={[styles.statSubtitle, { color: theme.colors.text.secondary }]}>Rating Mediu</Text>
-            </View>
-          </View>
-        </Card>
-        <Card
-          title=""
-          subtitle=""
-          variant="premium"
-          size="small"
-          containerStyle={{
-            ...styles.statCard,
-            backgroundColor: theme.colors.background.primary,
-            marginLeft: 6,
-          }}
-        >
-          <View style={styles.statContent}>
-            <Icon name="done-all" size={24} color={theme.colors.accent.green} />
-            <View style={styles.statTextContainer}>
-              <Text style={[styles.statTitle, { color: theme.colors.text.primary }]}>156</Text>
-              <Text style={[styles.statSubtitle, { color: theme.colors.text.secondary }]}>Lucrări Finalizate</Text>
-            </View>
-          </View>
-        </Card>
+        </View>
+      </Animated.View>
+
+      {/* Quick Actions */}
+      <Animated.View
+        style={[
+          styles.quickActionsContainer,
+          {
+            opacity: fadeAnimation,
+            transform: [{ translateY: slideAnimation }],
+          }
+        ]}
+      >
+        <View style={styles.quickActionsHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>Acțiuni Rapide</Text>
+        </View>
+        
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity
+            style={[styles.modernQuickActionCard, { backgroundColor: theme.colors.primary[500] }]}
+            onPress={() => (navigation as any).navigate('Dashboard', { screen: 'Jobs' })}
+          >
+            <Icon name="search" size={24} color={theme.colors.text.inverse} />
+            <Text style={[styles.modernQuickActionText, { color: theme.colors.text.inverse }]}>
+              Caută Joburi
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.modernQuickActionCard, { backgroundColor: theme.colors.background.primary, borderWidth: 1, borderColor: `${theme.colors.primary[500]}20` }]}
+            onPress={() => (navigation as any).navigate('Dashboard', { screen: 'Applications' })}
+          >
+            <Icon name="assignment" size={24} color={theme.colors.primary[500]} />
+            <Text style={[styles.modernQuickActionText, { color: theme.colors.text.primary }]}>
+              Aplicațiile Mele
+            </Text>
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       {/* New Requests */}
@@ -614,8 +652,8 @@ const HomeScreen: React.FC = () => {
             Cereri Noi
           </Text>
           <TouchableOpacity onPress={() => {
-            // Navigate to Jobs tab using React Navigation
-            (navigation as any).navigate('JobsStack');
+            // Navigate directly to Jobs within Dashboard stack
+            (navigation as any).navigate('Dashboard', { screen: 'Jobs' });
           }}>
             <Text style={[styles.seeAllText, { color: theme.colors.primary[500] }]}>
               {user?.userType === 'meserias' ? 'Vezi Joburi' : 'Vezi Toate'}
@@ -659,9 +697,9 @@ const HomeScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background.secondary }]}>
+    <Screen edges={['bottom']} backgroundColor={theme.colors.background.secondary}>
       {user?.userType === 'meserias' ? renderMeseriasHome() : renderClientHome()}
-    </SafeAreaView>
+    </Screen>
   );
 };
 
@@ -741,19 +779,141 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 12,
   },
-  statusBadge: {
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  statusCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    backgroundColor: '#fff', // Added for shadow optimization
+  },
+  statusContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
-    marginTop: 12,
   },
-  statusText: {
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  statusSubtext: {
     fontSize: 13,
+    fontWeight: '400',
+  },
+  statusToggle: {
+    padding: 4,
+  },
+  statsOverviewContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  statsCard: {
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+    backgroundColor: '#fff', // Added for shadow optimization
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
     fontWeight: '500',
-    marginLeft: 5,
+    textAlign: 'center',
+  },
+  quickActionsHeader: {
+    marginBottom: 16,
+  },
+  modernQuickActionCard: {
+    flex: 1,
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 6,
+    minHeight: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    backgroundColor: '#fff', // Added for shadow optimization
+  },
+  modernQuickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
 
   section: {
@@ -853,6 +1013,14 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 12,
+  },
+  quickActionsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });
 

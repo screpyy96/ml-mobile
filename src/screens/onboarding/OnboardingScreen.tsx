@@ -11,7 +11,7 @@ import {
   Dimensions, 
   Text
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { 
   Button,
@@ -207,7 +207,7 @@ const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
   const currentStepData = onboardingSteps[currentStep];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background.primary }]}>
+    <Screen backgroundColor={theme.colors.background.primary}>
       {/* Skip button */}
       <View style={styles.header}>
         <Button
@@ -278,7 +278,7 @@ const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
           size="large"
         />
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 

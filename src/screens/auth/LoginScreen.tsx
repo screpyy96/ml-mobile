@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated, Vibration } from 'react-native';
 import { Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Screen } from '../../design-system';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { useAuth } from '../../context/AuthContext';
@@ -218,8 +218,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#f8fafc' }]}>
-      <Animated.View
+    <Screen backgroundColor={'#f8fafc'}>
+      <Animated.View 
         style={[
           styles.content,
           {
@@ -346,7 +346,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           />
         </View>
       </Animated.View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
